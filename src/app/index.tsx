@@ -1,6 +1,19 @@
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
+import {
+  BadgeCheck,
+  Bell,
+  CheckCircle2,
+  ChevronRight,
+  Copy,
+  Database,
+  FileText,
+  Globe,
+  Inbox,
+  Package,
+  ShieldCheck,
+  Upload,
+} from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -17,30 +30,20 @@ function DidCard() {
       <View style={styles.didCardTop}>
         <View style={styles.didStatusRow}>
           <ThemedText style={styles.didActiveTitle}>DID ativo</ThemedText>
-          <SymbolView
-            name="checkmark.circle.fill"
-            size={22}
-            tintColor="#22C55E"
-            style={styles.didCheckIcon}
-          />
+          <CheckCircle2 size={22} color="#22C55E" />
         </View>
         <View style={styles.didAddressRow}>
           <ThemedText style={styles.didAddress}>did:tdw:0x7f3a...9b2c</ThemedText>
-          <SymbolView name="doc.on.doc" size={16} tintColor="#A0C4E8" />
+          <Copy size={16} color="#A0C4E8" />
         </View>
 
-        <SymbolView
-          name="lock.shield.fill"
-          size={72}
-          tintColor="rgba(255,255,255,0.18)"
-          style={styles.didShieldIcon}
-        />
+        <ShieldCheck size={72} color="rgba(255,255,255,0.18)" style={styles.didShieldIcon} />
       </View>
 
       <View style={styles.didCardDivider} />
 
       <View style={styles.didCardBottom}>
-        <SymbolView name="cylinder.split.1x2.fill" size={28} tintColor="#A0C4E8" />
+        <Database size={28} color="#A0C4E8" />
         <View style={styles.didWalletInfo}>
           <ThemedText style={styles.didWalletLabel}>Carteira</ThemedText>
           <ThemedText style={styles.didWalletValue}>SQLite cifrado</ThemedText>
@@ -56,18 +59,18 @@ function DidCard() {
 // ── Action Card ───────────────────────────────────────────────────────────────
 
 type ActionCardProps = {
-  icon: string;
-  iconColor: string;
+  icon: React.ReactNode;
+  iconBg: string;
   title: string;
   subtitle: string;
   badge?: number;
 };
 
-function ActionCard({ icon, iconColor, title, subtitle, badge }: ActionCardProps) {
+function ActionCard({ icon, iconBg, title, subtitle, badge }: ActionCardProps) {
   return (
     <TouchableOpacity style={styles.actionCard}>
-      <View style={[styles.actionIconContainer, { backgroundColor: iconColor + '18' }]}>
-        <SymbolView name={icon as any} size={26} tintColor={iconColor} />
+      <View style={[styles.actionIconContainer, { backgroundColor: iconBg }]}>
+        {icon}
       </View>
       <View style={styles.actionCardBody}>
         <View style={styles.actionCardTitleRow}>
@@ -81,7 +84,7 @@ function ActionCard({ icon, iconColor, title, subtitle, badge }: ActionCardProps
         {subtitle ? (
           <View style={styles.actionCardSubRow}>
             <ThemedText style={styles.actionCardSubtitle}>{subtitle}</ThemedText>
-            <SymbolView name="chevron.right" size={11} tintColor="#9AA5B4" />
+            <ChevronRight size={14} color="#9AA5B4" />
           </View>
         ) : null}
       </View>
@@ -95,13 +98,13 @@ function ExportCard() {
   return (
     <TouchableOpacity style={styles.exportCard}>
       <View style={styles.exportIconContainer}>
-        <SymbolView name="square.and.arrow.up.on.square" size={28} tintColor={BLUE} />
+        <Upload size={28} color={BLUE} />
       </View>
       <View style={styles.exportCardText}>
         <ThemedText style={styles.exportCardTitle}>Exportar chave pública</ThemedText>
         <ThemedText style={styles.exportCardSubtitle}>Compartilhe sua chave pública DID</ThemedText>
       </View>
-      <SymbolView name="chevron.right" size={14} tintColor="#9AA5B4" />
+      <ChevronRight size={16} color="#9AA5B4" />
     </TouchableOpacity>
   );
 }
@@ -109,7 +112,7 @@ function ExportCard() {
 // ── Connection Item ───────────────────────────────────────────────────────────
 
 type ConnectionItemProps = {
-  icon: string;
+  icon: React.ReactNode;
   iconColor: string;
   name: string;
 };
@@ -118,7 +121,7 @@ function ConnectionItem({ icon, iconColor, name }: ConnectionItemProps) {
   return (
     <View style={styles.connectionItem}>
       <View style={[styles.connectionIconWrap, { backgroundColor: iconColor + '18' }]}>
-        <SymbolView name={icon as any} size={24} tintColor={iconColor} />
+        {icon}
       </View>
       <ThemedText style={styles.connectionName}>{name}</ThemedText>
       <View style={styles.connectionStatus}>
@@ -143,7 +146,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.logoWrap}>
-              <SymbolView name="lock.shield.fill" size={32} tintColor="#2B6BDF" />
+              <ShieldCheck size={28} color={BLUE} />
             </View>
             <View>
               <ThemedText style={styles.appTitle}>Assinador</ThemedText>
@@ -151,7 +154,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <TouchableOpacity style={styles.bellWrap}>
-            <SymbolView name="bell.fill" size={20} tintColor="#1A2C4E" />
+            <Bell size={20} color="#1A2C4E" />
             <View style={styles.bellDot} />
           </TouchableOpacity>
         </View>
@@ -162,27 +165,27 @@ export default function HomeScreen() {
         {/* 2×2 Action Grid */}
         <View style={styles.grid}>
           <ActionCard
-            icon="doc.badge.clock"
-            iconColor="#2B6BDF"
+            icon={<FileText size={26} color={BLUE} />}
+            iconBg={BLUE + '18'}
             title="Credenciais pendentes"
             subtitle=""
             badge={3}
           />
           <ActionCard
-            icon="checkmark.seal.fill"
-            iconColor="#22C55E"
+            icon={<BadgeCheck size={26} color="#22C55E" />}
+            iconBg="#22C55E18"
             title="Emitidas"
             subtitle="12 credenciais"
           />
           <ActionCard
-            icon="tray.and.arrow.down.fill"
-            iconColor="#9B59B6"
+            icon={<Inbox size={26} color="#9B59B6" />}
+            iconBg="#9B59B618"
             title="Recebidas"
             subtitle="8 credenciais"
           />
           <ActionCard
-            icon="doc.richtext.fill"
-            iconColor="#2B6BDF"
+            icon={<FileText size={26} color={BLUE} />}
+            iconBg={BLUE + '18'}
             title="Verificar PDF"
             subtitle="Assinaturas e credenciais"
           />
@@ -194,8 +197,16 @@ export default function HomeScreen() {
         {/* Conexões ativas */}
         <ThemedText style={styles.sectionTitle}>Conexões ativas</ThemedText>
         <View style={styles.connectionsRow}>
-          <ConnectionItem icon="globe" iconColor="#2B6BDF" name="Plataforma Web" />
-          <ConnectionItem icon="shippingbox.fill" iconColor="#22C55E" name="IPFS" />
+          <ConnectionItem
+            icon={<Globe size={24} color={BLUE} />}
+            iconColor={BLUE}
+            name="Plataforma Web"
+          />
+          <ConnectionItem
+            icon={<Package size={24} color="#22C55E" />}
+            iconColor="#22C55E"
+            name="IPFS"
+          />
         </View>
 
       </ScrollView>
@@ -311,9 +322,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     lineHeight: 32,
-  },
-  didCheckIcon: {
-    marginTop: 2,
   },
   didAddressRow: {
     flexDirection: 'row',
