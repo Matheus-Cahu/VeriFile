@@ -47,10 +47,23 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   );
 }
 
-export function CustomTabList(props: TabListProps) {
+export function CustomTabList({ children, ...props }: TabListProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
+  return (
+    <View style={styles.tabListContainer}>
+      <ThemedView type="backgroundElement" style={styles.innerContainer} {...props}>
+        <ThemedText type="smallBold" style={styles.brandText}>
+          VeriFile
+        </ThemedText>
+        {children}
+        <ExternalLink href="https://docs.expo.dev" style={styles.externalPressable}>
+          <SymbolView name="book.fill" tintColor={colors.textSecondary} size={20} />
+        </ExternalLink>
+      </ThemedView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

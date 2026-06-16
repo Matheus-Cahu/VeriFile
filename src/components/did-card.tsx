@@ -5,6 +5,7 @@ import { Spacing } from '@/constants/theme';
 import { useEffect, useState } from 'react';
 import { generateKeyPair, publicKeyToDIDKey } from '../crypto/keys';
 import { saveKeyPair, listDIDs } from '../wallet/WalletDatabase';
+//import Clipboard from '@react-native-clipboard/clipboard';
 
 interface DIDRecord {
   id: string;
@@ -32,7 +33,7 @@ export function DidCard() {
   const [dids, setDids] = useState<DIDRecord[]>([]);
 
   useEffect(() => {
-    listDIDs().then(rows => setDids(rows as DIDRecord[]));
+    listDIDs().then(setDids);
   }, []);
 
   return (
@@ -52,8 +53,14 @@ export function DidCard() {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.didAddress}>{item.did}</Text>
-                <Copy size={16} color="#A0C4E8" />
+                <Text style={styles.didAddress}>{item.did.slice(0,20)+"..."}</Text>
+                <Pressable
+                  onPress={() => {
+                   // Clipboard.setString(item.public_key);
+                    Alert.alert('Chave pública copiada', item.public_key);
+                  }}>
+                  <Copy size={16} color="#A0C4E8" />
+                </Pressable>
               </View>
             )}
           />
@@ -72,7 +79,6 @@ export function DidCard() {
         <Pressable onPress={async () => {
           if (dids.length === 0) {
             await createNewIdentity();
-            listDIDs().then(rows => setDids(rows as DIDRecord[]));
           } else {
             Alert.alert('Você já possui uma DID');
           }

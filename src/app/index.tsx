@@ -54,20 +54,20 @@ function ActionCard({ icon, iconBg, title, subtitle, badge }: ActionCardProps) {
 
 // ── Export Card ───────────────────────────────────────────────────────────────
 
-function ExportCard() {
-  return (
-    <TouchableOpacity style={styles.exportCard}>
-      <View style={styles.exportIconContainer}>
-        <Upload size={28} color={BLUE} />
-      </View>
-      <View style={styles.exportCardText}>
-        <ThemedText style={styles.exportCardTitle}>Exportar chave pública</ThemedText>
-        <ThemedText style={styles.exportCardSubtitle}>Compartilhe sua chave pública DID</ThemedText>
-      </View>
-      <ChevronRight size={16} color="#9AA5B4" />
-    </TouchableOpacity>
-  );
-}
+// function ExportCard() {
+//   return (
+//     <TouchableOpacity style={styles.exportCard}>
+//       <View style={styles.exportIconContainer}>
+//         <Upload size={28} color={BLUE} />
+//       </View>
+//       <View style={styles.exportCardText}>
+//         <ThemedText style={styles.exportCardTitle}>Exportar chave pública</ThemedText>
+//         <ThemedText style={styles.exportCardSubtitle}>Compartilhe sua chave pública DID</ThemedText>
+//       </View>
+//       <ChevronRight size={16} color="#9AA5B4" />
+//     </TouchableOpacity>
+//   );
+// }
 
 // ── Connection Item ───────────────────────────────────────────────────────────
 
@@ -124,35 +124,35 @@ export default function HomeScreen() {
 
         {/* 2×2 Action Grid */}
         <View style={styles.grid}>
-          <ActionCard
-            icon={<FileText size={26} color={BLUE} />}
-            iconBg={BLUE + '18'}
-            title="Credenciais pendentes"
-            subtitle=""
-            badge={3}
-          />
-          <ActionCard
-            icon={<BadgeCheck size={26} color="#22C55E" />}
-            iconBg="#22C55E18"
-            title="Emitidas"
-            subtitle="12 credenciais"
-          />
-          <ActionCard
-            icon={<Inbox size={26} color="#9B59B6" />}
-            iconBg="#9B59B618"
-            title="Recebidas"
-            subtitle="8 credenciais"
-          />
-          <ActionCard
-            icon={<FileText size={26} color={BLUE} />}
-            iconBg={BLUE + '18'}
-            title="Verificar PDF"
-            subtitle="Assinaturas e credenciais"
-          />
+          {/* <ActionCard */}
+          {/*   icon={<FileText size={26} color={BLUE} />} */}
+          {/*   iconBg={BLUE + '18'} */}
+          {/*   title="Credenciais pendentes" */}
+          {/*   subtitle="" */}
+          {/*   badge={3} */}
+          {/* /> */}
+          {/* <ActionCard */}
+          {/*   icon={<BadgeCheck size={26} color="#22C55E" />} */}
+          {/*   iconBg="#22C55E18" */}
+          {/*   title="Emitidas" */}
+          {/*   subtitle="12 credenciais" */}
+          {/* /> */}
+          {/* <ActionCard */}
+          {/*   icon={<Inbox size={26} color="#9B59B6" />} */}
+          {/*   iconBg="#9B59B618" */}
+          {/*   title="Recebidas" */}
+          {/*   subtitle="8 credenciais" */}
+          {/* /> */}
+          {/* <ActionCard */}
+          {/*   icon={<FileText size={26} color={BLUE} />} */}
+          {/*   iconBg={BLUE + '18'} */}
+          {/*   title="Verificar PDF" */}
+          {/*   subtitle="Assinaturas e credenciais" */}
+          {/* /> */}
         </View>
 
         {/* Export Card */}
-        <ExportCard />
+        {/* <ExportCard /> */}
 
         {/* Conexões ativas */}
         <ThemedText style={styles.sectionTitle}>Conexões ativas</ThemedText>
