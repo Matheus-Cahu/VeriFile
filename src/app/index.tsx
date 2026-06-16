@@ -3,10 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BadgeCheck,
   Bell,
-  CheckCircle2,
   ChevronRight,
-  Copy,
-  Database,
   FileText,
   Globe,
   Inbox,
@@ -15,46 +12,9 @@ import {
   Upload,
 } from 'lucide-react-native';
 
+import { DidCard } from '@/components/did-card';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-
-// ── DID Card ──────────────────────────────────────────────────────────────────
-
-function DidCard() {
-  return (
-    <View style={styles.didCard}>
-      <View style={styles.didBadge}>
-        <ThemedText style={styles.didBadgeText}>DID</ThemedText>
-      </View>
-
-      <View style={styles.didCardTop}>
-        <View style={styles.didStatusRow}>
-          <ThemedText style={styles.didActiveTitle}>DID ativo</ThemedText>
-          <CheckCircle2 size={22} color="#22C55E" />
-        </View>
-        <View style={styles.didAddressRow}>
-          <ThemedText style={styles.didAddress}>did:tdw:0x7f3a...9b2c</ThemedText>
-          <Copy size={16} color="#A0C4E8" />
-        </View>
-
-        <ShieldCheck size={72} color="rgba(255,255,255,0.18)" style={styles.didShieldIcon} />
-      </View>
-
-      <View style={styles.didCardDivider} />
-
-      <View style={styles.didCardBottom}>
-        <Database size={28} color="#A0C4E8" />
-        <View style={styles.didWalletInfo}>
-          <ThemedText style={styles.didWalletLabel}>Carteira</ThemedText>
-          <ThemedText style={styles.didWalletValue}>SQLite cifrado</ThemedText>
-        </View>
-        <View style={styles.didProtectedBadge}>
-          <ThemedText style={styles.didProtectedText}>Protegida</ThemedText>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 // ── Action Card ───────────────────────────────────────────────────────────────
 
@@ -218,7 +178,6 @@ export default function HomeScreen() {
 
 const BG = '#EDF2FA';
 const CARD_BG = '#FFFFFF';
-const DID_CARD_BG = '#0D3654';
 const TEXT = '#1A2C4E';
 const TEXT_SECONDARY = '#6B7A90';
 const BLUE = '#2B6BDF';
@@ -286,92 +245,6 @@ const styles = StyleSheet.create({
     backgroundColor: BLUE,
     borderWidth: 1.5,
     borderColor: CARD_BG,
-  },
-
-  // DID Card
-  didCard: {
-    backgroundColor: DID_CARD_BG,
-    borderRadius: 20,
-    padding: Spacing.three,
-    overflow: 'hidden',
-  },
-  didBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: Spacing.two,
-  },
-  didBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  didCardTop: {
-    position: 'relative',
-    marginBottom: Spacing.two,
-  },
-  didStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  didActiveTitle: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '700',
-    lineHeight: 32,
-  },
-  didAddressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  didAddress: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-    fontFamily: 'monospace',
-  },
-  didShieldIcon: {
-    position: 'absolute',
-    right: -8,
-    top: -8,
-  },
-  didCardDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginVertical: Spacing.two,
-  },
-  didCardBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  didWalletInfo: {
-    flex: 1,
-  },
-  didWalletLabel: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  didWalletValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  didProtectedBadge: {
-    backgroundColor: '#22C55E',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  didProtectedText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
   },
 
   // Action Grid
