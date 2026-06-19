@@ -1,9 +1,11 @@
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import {
   BadgeCheck,
   Bell,
   ChevronRight,
+  Pencil,
   FileText,
   Globe,
   Inbox,
@@ -122,6 +124,16 @@ export default function HomeScreen() {
         {/* DID Card */}
         <DidCard />
 
+        {/* Assinar nova credencial */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/signing')}>
+          <View style={styles.createNew}>
+            <View style={styles.createNewIcon}>
+              <Pencil size={20} color="#FFFFFF" />
+            </View>
+            <ThemedText style={styles.createNewText}>Assinar nova VC</ThemedText>
+            <ChevronRight size={20} color="rgba(255,255,255,0.9)" />
+          </View>
+        </TouchableOpacity>
         {/* 2×2 Action Grid */}
         <View style={styles.grid}>
           {/* <ActionCard */}
@@ -390,5 +402,33 @@ const styles = StyleSheet.create({
   connectionStatusText: {
     fontSize: 12,
     color: TEXT_SECONDARY,
+  },
+  createNew: {
+    backgroundColor: '#22C55E',
+    borderRadius: 16,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    shadowColor: '#22C55E',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  createNewIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createNewText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
