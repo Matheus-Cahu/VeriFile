@@ -2,12 +2,14 @@
 // React Native (react-native-ssi-pq / uniffi). Substitui o antigo stub baseado
 // em secp256k1: agora usamos ML-DSA (assinatura) e ML-KEM (encapsulamento).
 import {
+  base64urlEncode,
   createDid,
   createSchemaFromAttributes,
   didVerify,
   issueCredentialFromSchema,
   mldsaSign,
   mldsaVerify,
+  signedCredentialToPdf,
   verifySignedCredential,
 } from 'react-native-ssi-pq';
 
@@ -49,6 +51,25 @@ export function createPqIdentity(options?: {
     didDocument: result.didDocument,
     privateKeys: JSON.parse(result.privateKeys) as PqPrivateKeys,
   };
+}
+
+/**
+ * Gera o PDF visual de uma credencial assinada e o devolve em base64 padrão
+ * (pronto para `expo-file-system` escrever com `encoding: 'base64'`).
+ *
+ * Reaproveita `base64urlEncode` do core para serializar os bytes e converte
+ * base64url → base64 padrão (com padding).
+ */
+export function credentialToPdfBase64(
+  signedCredential: string,
+  labels?: Record<string, string>
+): string {
+  const options = labels ? JSON.stringify({ labels }) : undefined;
+  const pdfBytes = signedCredentialToPdf(signedCredential, options);
+  const b64url = base64urlEncode(pdfBytes);
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = (4 - (b64.length % 4)) % 4;
+  return b64 + '='.repeat(padding);
 }
 
 /** Verifica a auto-assinatura e a coerência de fingerprint de um DID Document. */

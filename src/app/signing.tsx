@@ -14,11 +14,45 @@ import {
 } from 'react-native';
 import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react-native';
 
-import { issueCredential } from '../crypto/keys';
+import {
+  cacheDirectory,
+  documentDirectory,
+  StorageAccessFramework,
+  writeAsStringAsync,
+} from 'expo-file-system/legacy';
+
+import { credentialToPdfBase64, issueCredential } from '../crypto/keys';
 import { getIdentity, listDIDs, type DidSummary } from '../wallet/WalletDatabase';
 import { Colors, Spacing } from '@/constants/theme';
 
 type AttributeRow = { key: string; value: string };
+
+// Salva o PDF (base64) num arquivo. No Android usa o Storage Access Framework
+// para o usuário escolher a pasta (ex.: Downloads) — um "download" de verdade.
+async function downloadPdf(base64: string) {
+  const fileName = `credencial-${Date.now()}`;
+
+  if (Platform.OS === 'android') {
+    const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('PDF não salvo', 'Nenhuma pasta foi escolhida.');
+      return;
+    }
+    const uri = await StorageAccessFramework.createFileAsync(
+      perm.directoryUri,
+      fileName,
+      'application/pdf'
+    );
+    await writeAsStringAsync(uri, base64, { encoding: 'base64' });
+    Alert.alert('PDF salvo', `${fileName}.pdf`);
+    return;
+  }
+
+  // iOS/outros: grava na pasta do app (sandbox) e informa o caminho.
+  const fileUri = `${documentDirectory ?? cacheDirectory ?? ''}${fileName}.pdf`;
+  await writeAsStringAsync(fileUri, base64, { encoding: 'base64' });
+  Alert.alert('PDF salvo', fileUri);
+}
 
 const INITIAL_ROWS: AttributeRow[] = [
   { key: 'nome', value: '' },
@@ -93,6 +127,13 @@ export default function Signing() {
         json: JSON.stringify(JSON.parse(issued.signedCredential), null, 2),
         verified: issued.verified,
       });
+
+      // Gera o PDF visual da credencial e baixa para uma pasta escolhida.
+      const labels = Object.fromEntries(
+        Object.keys(attributes).map((key) => [`subject.${key}`, key])
+      );
+      const pdfBase64 = credentialToPdfBase64(issued.signedCredential, labels);
+      await downloadPdf(pdfBase64);
     } catch (error) {
       Alert.alert(
         'Falha ao assinar credencial',
