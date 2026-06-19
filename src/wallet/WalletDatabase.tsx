@@ -1,8 +1,11 @@
 // wallet/WalletDatabase.ts
+// Carteira local cifrada (SQLCipher via op-sqlite) para guardar as identidades
+// pós-quânticas geradas pelo core SSI-PQ. A senha do banco fica no Keychain.
 import { open, type DB } from '@op-engineering/op-sqlite';
 import * as Keychain from 'react-native-keychain';
 import { getRandomBytesAsync } from 'expo-crypto'; // ou react-native-get-random-values
 import { bytesToHex } from '@noble/hashes/utils.js';
+import type { PqIdentity } from '../crypto/keys';
 
 const DB_NAME = 'wallet.db';
 const KEYCHAIN_SERVICE = 'com.seuapp.wallet.dbkey';
@@ -43,13 +46,17 @@ export async function openWallet(): Promise<DB> {
     encryptionKey: password, // SQLCipher recebe a chave aqui
   });
 
+  // Identidades pós-quânticas: o DID Document é público; as chaves privadas
+  // ML-DSA/ML-KEM ficam cifradas em repouso pelo SQLCipher.
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS keys (
-      id          TEXT PRIMARY KEY,
-      did         TEXT NOT NULL,
-      private_key TEXT NOT NULL,  -- hex, cifrado pelo SQLCipher
-      public_key  TEXT NOT NULL,
-      created_at  INTEGER NOT NULL
+    CREATE TABLE IF NOT EXISTS identities (
+      id                TEXT PRIMARY KEY,
+      did               TEXT NOT NULL,
+      fingerprint       TEXT NOT NULL,
+      did_document      TEXT NOT NULL,
+      mldsa_private_key TEXT NOT NULL,
+      mlkem_private_key TEXT NOT NULL,
+      created_at        INTEGER NOT NULL
     )
   `);
 
@@ -61,42 +68,55 @@ export async function openWallet(): Promise<DB> {
 export type DidSummary = {
   id: string;
   did: string;
-  public_key: string;
+  fingerprint: string;
   created_at: number;
 };
 
-export async function saveKeyPair(params: {
+export type StoredIdentity = DidSummary & {
+  did_document: string;
+  mldsa_private_key: string;
+  mlkem_private_key: string;
+};
+
+export async function saveIdentity(params: {
   id: string;
-  did: string;
-  privateKeyHex: string;
-  publicKeyHex: string;
+  identity: PqIdentity;
 }): Promise<void> {
   const wallet = await openWallet();
+  const { identity } = params;
 
   await wallet.execute(
-    `INSERT INTO keys (id, did, private_key, public_key, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [params.id, params.did, params.privateKeyHex, params.publicKeyHex, Date.now()]
+    `INSERT INTO identities
+       (id, did, fingerprint, did_document, mldsa_private_key, mlkem_private_key, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      params.id,
+      identity.did,
+      identity.fingerprint,
+      identity.didDocument,
+      identity.privateKeys.mldsaPrivateKey,
+      identity.privateKeys.mlkemPrivateKey,
+      Date.now(),
+    ]
   );
 }
 
-export async function getKeyPair(id: string) {
+export async function getIdentity(id: string): Promise<StoredIdentity | null> {
   const wallet = await openWallet();
 
-  const result = await wallet.execute(
-    `SELECT * FROM keys WHERE id = ?`,
-    [id]
-  );
+  const result = await wallet.execute(`SELECT * FROM identities WHERE id = ?`, [
+    id,
+  ]);
 
-  return result.rows?.[0] ?? null;
+  return (result.rows?.[0] as unknown as StoredIdentity) ?? null;
 }
 
 export async function listDIDs(): Promise<DidSummary[]> {
   const wallet = await openWallet();
 
   const result = await wallet.execute(
-    `SELECT id, did, public_key, created_at FROM keys ORDER BY created_at DESC`
+    `SELECT id, did, fingerprint, created_at FROM identities ORDER BY created_at DESC`
   );
-  // private_key intencionalmente omitido na listagem
+  // chaves privadas intencionalmente omitidas na listagem
   return (result.rows ?? []) as unknown as DidSummary[];
 }

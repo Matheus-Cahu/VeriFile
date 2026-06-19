@@ -3,28 +3,22 @@ import { CheckCircle2, Copy, Database, ShieldCheck } from 'lucide-react-native';
 import { ThemedText } from './themed-text';
 import { Spacing } from '@/constants/theme';
 import { useEffect, useState } from 'react';
-import { generateKeyPair, publicKeyToDIDKey } from '../crypto/keys';
-import { saveKeyPair, listDIDs } from '../wallet/WalletDatabase';
+import { createPqIdentity } from '../crypto/keys';
+import { saveIdentity, listDIDs } from '../wallet/WalletDatabase';
 //import Clipboard from '@react-native-clipboard/clipboard';
 
 interface DIDRecord {
   id: string;
   did: string;
-  public_key: string;
+  fingerprint: string;
   created_at: number;
 }
 
 async function createNewIdentity() {
   const label = `did-${Date.now()}`;
-  const keyPair = generateKeyPair();
-  const did = publicKeyToDIDKey(keyPair.publicKey);
-  await saveKeyPair({
-    id: label,
-    did,
-    privateKeyHex: keyPair.privateKeyHex,
-    publicKeyHex: keyPair.publicKeyHex,
-  });
-  console.log('DID criado:', did);
+  const identity = createPqIdentity();
+  await saveIdentity({ id: label, identity });
+  console.log('DID pós-quântico criado:', identity.did);
 }
 
 const DID_CARD_BG = '#0D3654';
@@ -56,8 +50,8 @@ export function DidCard() {
                 <Text style={styles.didAddress}>{item.did.slice(0,20)+"..."}</Text>
                 <Pressable
                   onPress={() => {
-                   // Clipboard.setString(item.public_key);
-                    Alert.alert('Chave pública copiada', item.public_key);
+                   // Clipboard.setString(item.fingerprint);
+                    Alert.alert('Fingerprint do DID', item.fingerprint);
                   }}>
                   <Copy size={16} color="#A0C4E8" />
                 </Pressable>
