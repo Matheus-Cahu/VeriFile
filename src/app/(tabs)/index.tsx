@@ -134,6 +134,17 @@ export default function HomeScreen() {
             <ChevronRight size={20} color="rgba(255,255,255,0.9)" />
           </View>
         </TouchableOpacity>
+
+        {/* Verificar credencial a partir de um PDF */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/verify')}>
+          <View style={[styles.createNew, styles.verifyVc]}>
+            <View style={styles.createNewIcon}>
+              <BadgeCheck size={20} color="#FFFFFF" />
+            </View>
+            <ThemedText style={styles.createNewText}>Verificar VC</ThemedText>
+            <ChevronRight size={20} color="rgba(255,255,255,0.9)" />
+          </View>
+        </TouchableOpacity>
         {/* 2×2 Action Grid */}
         <View style={styles.grid}>
           {/* <ActionCard */}
@@ -416,6 +427,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
+  },
+  verifyVc: {
+    backgroundColor: '#0D3654',
+    shadowColor: '#0D3654',
+    marginTop: Spacing.two,
   },
   createNewIcon: {
     width: 36,

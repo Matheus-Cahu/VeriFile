@@ -111,6 +111,19 @@ export async function getIdentity(id: string): Promise<StoredIdentity | null> {
   return (result.rows?.[0] as unknown as StoredIdentity) ?? null;
 }
 
+export async function getIdentityByDid(
+  did: string
+): Promise<StoredIdentity | null> {
+  const wallet = await openWallet();
+
+  const result = await wallet.execute(
+    `SELECT * FROM identities WHERE did = ?`,
+    [did]
+  );
+
+  return (result.rows?.[0] as unknown as StoredIdentity) ?? null;
+}
+
 export async function listDIDs(): Promise<DidSummary[]> {
   const wallet = await openWallet();
 

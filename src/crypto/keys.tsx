@@ -6,11 +6,14 @@ import {
   createDid,
   createSchemaFromAttributes,
   didVerify,
+  embedSignedCredentialInPdf,
+  extractCredentialManifestFromPdf,
   issueCredentialFromSchema,
   mldsaSign,
   mldsaVerify,
   signedCredentialToPdf,
   verifySignedCredential,
+  verifySignedCredentialPdf,
 } from 'react-native-ssi-pq';
 
 export const DEFAULT_MLDSA_PROFILE = 'ML-DSA-65';
@@ -53,23 +56,93 @@ export function createPqIdentity(options?: {
   };
 }
 
-/**
- * Gera o PDF visual de uma credencial assinada e o devolve em base64 padrão
- * (pronto para `expo-file-system` escrever com `encoding: 'base64'`).
- *
- * Reaproveita `base64urlEncode` do core para serializar os bytes e converte
- * base64url → base64 padrão (com padding).
- */
-export function credentialToPdfBase64(
-  signedCredential: string,
-  labels?: Record<string, string>
-): string {
-  const options = labels ? JSON.stringify({ labels }) : undefined;
-  const pdfBytes = signedCredentialToPdf(signedCredential, options);
-  const b64url = base64urlEncode(pdfBytes);
+// Converte bytes (ArrayBuffer) em base64 padrão, reaproveitando o
+// base64urlEncode do core e ajustando para o alfabeto/padding padrão.
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const b64url = base64urlEncode(buffer);
   const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
   const padding = (4 - (b64.length % 4)) % 4;
   return b64 + '='.repeat(padding);
+}
+
+/**
+ * Gera o PDF **verificável** de uma credencial assinada (base64 padrão).
+ *
+ * Faz `signedCredentialToPdf` (PDF visual) e em seguida
+ * `embedSignedCredentialInPdf`, que embute o manifesto SSI e assina o vínculo
+ * PDF↔credencial com a chave ML-DSA do emissor. É este PDF que passa em
+ * `verifyCredentialPdf`.
+ */
+export function credentialToPdfBase64(
+  signedCredential: string,
+  issuerDidDocument: string,
+  issuerMldsaPrivateKey: string,
+  labels?: Record<string, string>
+): string {
+  const options = labels ? JSON.stringify({ labels }) : undefined;
+  const pdfBase = signedCredentialToPdf(signedCredential, options);
+  const finalPdf = embedSignedCredentialInPdf(
+    pdfBase,
+    signedCredential,
+    issuerDidDocument,
+    issuerMldsaPrivateKey,
+    undefined
+  );
+  return arrayBufferToBase64(finalPdf);
+}
+
+export interface PdfVerification {
+  /** Todas as verificações obrigatórias passaram. */
+  valid: boolean;
+  /** Estado resumido (ex.: "valid", "invalid"). */
+  status: string;
+  /** DID do emissor extraído do manifesto. */
+  issuerDid?: string;
+  credentialId?: string;
+  credentialSignatureValid: boolean;
+  documentBindingSignatureValid: boolean;
+  pdfBaseHashValid: boolean;
+  didKeyMatch: boolean;
+  errors: string[];
+  /** Diagnóstico completo (JSON formatado). */
+  raw: string;
+}
+
+/**
+ * Extrai o DID do emissor do manifesto SSI embutido no PDF, ou `null` se o PDF
+ * não contiver manifesto (ex.: PDF que não é credencial).
+ */
+export function extractIssuerDidFromPdf(pdfBytes: ArrayBuffer): string | null {
+  try {
+    const manifest = JSON.parse(extractCredentialManifestFromPdf(pdfBytes));
+    return (
+      manifest?.document_binding?.issuer_did ??
+      manifest?.signed_credential?.credential?.issuer_did ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Verifica criptograficamente um PDF-credencial contra o DID Document do emissor. */
+export function verifyCredentialPdf(
+  pdfBytes: ArrayBuffer,
+  issuerDidDocument: string
+): PdfVerification {
+  const r = JSON.parse(verifySignedCredentialPdf(pdfBytes, issuerDidDocument));
+  return {
+    valid: !!r.valid,
+    status: r.status,
+    issuerDid: r.issuer_did ?? undefined,
+    credentialId: r.credential_id ?? undefined,
+    credentialSignatureValid: !!r.credential_signature_valid,
+    documentBindingSignatureValid: !!r.document_binding_signature_valid,
+    pdfBaseHashValid: !!r.pdf_base_hash_valid,
+    didKeyMatch: !!r.did_key_match,
+    errors: r.errors ?? [],
+    raw: JSON.stringify(r, null, 2),
+  };
 }
 
 /** Verifica a auto-assinatura e a coerência de fingerprint de um DID Document. */

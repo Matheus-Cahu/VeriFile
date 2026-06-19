@@ -11,6 +11,7 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="signing" options={{ title: 'Assinar nova VC' }} />
+        <Stack.Screen name="verify" options={{ title: 'Verificar VC' }} />
       </Stack>
     </ThemeProvider>
   );

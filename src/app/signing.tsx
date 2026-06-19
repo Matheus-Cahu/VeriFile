@@ -132,7 +132,12 @@ export default function Signing() {
       const labels = Object.fromEntries(
         Object.keys(attributes).map((key) => [`subject.${key}`, key])
       );
-      const pdfBase64 = credentialToPdfBase64(issued.signedCredential, labels);
+      const pdfBase64 = credentialToPdfBase64(
+        issued.signedCredential,
+        identity.did_document,
+        identity.mldsa_private_key,
+        labels
+      );
       await downloadPdf(pdfBase64);
     } catch (error) {
       Alert.alert(
