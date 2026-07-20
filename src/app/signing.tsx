@@ -117,7 +117,7 @@ export default function Signing() {
       const identity = await getIdentity(selectedId);
       if (!identity) throw new Error('Identidade não encontrada na carteira');
 
-      const issued = issueCredential(
+      const issued = await issueCredential(
         identity.did_document,
         identity.mldsa_private_key,
         attributes
@@ -132,7 +132,7 @@ export default function Signing() {
       const labels = Object.fromEntries(
         Object.keys(attributes).map((key) => [`subject.${key}`, key])
       );
-      const pdfBase64 = credentialToPdfBase64(
+      const pdfBase64 = await credentialToPdfBase64(
         issued.signedCredential,
         identity.did_document,
         identity.mldsa_private_key,

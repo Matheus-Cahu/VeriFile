@@ -1,10 +1,10 @@
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   BadgeCheck,
-  Bell,
   ChevronRight,
+  LogOut,
   Pencil,
   FileText,
   Globe,
@@ -12,11 +12,16 @@ import {
   Package,
   ShieldCheck,
   Upload,
+  User,
 } from 'lucide-react-native';
+
+import { useEffect, useState } from 'react';
 
 import { DidCard } from '@/components/did-card';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/auth/auth-context';
+import { fetchPendingCredentials } from '@/auth/pending-credentials';
 
 // ── Action Card ───────────────────────────────────────────────────────────────
 
@@ -26,11 +31,12 @@ type ActionCardProps = {
   title: string;
   subtitle: string;
   badge?: number;
+  onPress?: () => void;
 };
 
-function ActionCard({ icon, iconBg, title, subtitle, badge }: ActionCardProps) {
+function ActionCard({ icon, iconBg, title, subtitle, badge, onPress }: ActionCardProps) {
   return (
-    <TouchableOpacity style={styles.actionCard}>
+    <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.85}>
       <View style={[styles.actionIconContainer, { backgroundColor: iconBg }]}>
         {icon}
       </View>
@@ -97,6 +103,29 @@ function ConnectionItem({ icon, iconColor, name }: ConnectionItemProps) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const { user, signOut } = useAuth();
+  // Contagem de ofertas pendentes para o badge do card. Silenciosa: se o
+  // backend estiver fora, o card ainda navega, só sem número.
+  const [pendingCount, setPendingCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!user?.idToken) return;
+    let active = true;
+    fetchPendingCredentials(user.idToken)
+      .then((list) => active && setPendingCount(list.length))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [user?.idToken]);
+
+  function confirmSignOut() {
+    Alert.alert('Sair da conta', `Deseja sair de ${user?.email ?? 'sua conta'}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => signOut() },
+    ]);
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -112,12 +141,23 @@ export default function HomeScreen() {
             </View>
             <View>
               <ThemedText style={styles.appTitle}>Assinador</ThemedText>
-              <ThemedText style={styles.appSubtitle}>Carteira e DID</ThemedText>
+              <ThemedText style={styles.appSubtitle} numberOfLines={1}>
+                {user?.name ?? user?.email ?? 'Carteira e DID'}
+              </ThemedText>
             </View>
           </View>
-          <TouchableOpacity style={styles.bellWrap}>
-            <Bell size={20} color="#1A2C4E" />
-            <View style={styles.bellDot} />
+          <TouchableOpacity
+            style={styles.accountWrap}
+            onPress={confirmSignOut}
+            accessibilityLabel="Conta e sair">
+            {user?.photo ? (
+              <Image source={{ uri: user.photo }} style={styles.avatar} />
+            ) : (
+              <User size={20} color="#1A2C4E" />
+            )}
+            <View style={styles.logoutBadge}>
+              <LogOut size={11} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -147,13 +187,14 @@ export default function HomeScreen() {
         </TouchableOpacity>
         {/* 2×2 Action Grid */}
         <View style={styles.grid}>
-          {/* <ActionCard */}
-          {/*   icon={<FileText size={26} color={BLUE} />} */}
-          {/*   iconBg={BLUE + '18'} */}
-          {/*   title="Credenciais pendentes" */}
-          {/*   subtitle="" */}
-          {/*   badge={3} */}
-          {/* /> */}
+          <ActionCard
+            icon={<FileText size={26} color={BLUE} />}
+            iconBg={BLUE + '18'}
+            title="Credenciais pendentes"
+            subtitle={pendingCount > 0 ? 'Ofertas para assinar' : 'Nenhuma pendente'}
+            badge={pendingCount > 0 ? pendingCount : undefined}
+            onPress={() => router.push('/pendentes')}
+          />
           {/* <ActionCard */}
           {/*   icon={<BadgeCheck size={26} color="#22C55E" />} */}
           {/*   iconBg="#22C55E18" */}
@@ -250,7 +291,7 @@ const styles = StyleSheet.create({
     color: TEXT_SECONDARY,
     lineHeight: 18,
   },
-  bellWrap: {
+  accountWrap: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -258,16 +299,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bellDot: {
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  logoutBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: BLUE,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: CARD_BG,
+    borderColor: BG,
   },
 
   // Action Grid

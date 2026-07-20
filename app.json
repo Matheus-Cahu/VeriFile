@@ -35,8 +35,18 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.SUBSTITUA_PELO_IOS_CLIENT_ID_REVERSO"
+        }
       ]
     ],
+    "extra": {
+      "googleWebClientId": "134992816030-h0rfc4oe0gnq2eqqn231o2ao6kf2frmg.apps.googleusercontent.com",
+      "googleIosClientId": "SUBSTITUA_PELO_IOS_CLIENT_ID.apps.googleusercontent.com"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

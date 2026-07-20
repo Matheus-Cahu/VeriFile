@@ -48,7 +48,7 @@ export default function Verify() {
 
       const bytes = await new File(asset.uri).arrayBuffer();
 
-      const issuerDid = extractIssuerDidFromPdf(bytes);
+      const issuerDid = await extractIssuerDidFromPdf(bytes);
       if (!issuerDid) {
         setMessage(
           'Este PDF não contém um manifesto SSI — não é uma credencial verificável.'
@@ -64,7 +64,7 @@ export default function Verify() {
         return;
       }
 
-      setVerification(verifyCredentialPdf(bytes, identity.did_document));
+      setVerification(await verifyCredentialPdf(bytes, identity.did_document));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {

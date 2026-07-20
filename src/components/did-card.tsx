@@ -16,7 +16,7 @@ interface DIDRecord {
 
 async function createNewIdentity() {
   const label = `did-${Date.now()}`;
-  const identity = createPqIdentity();
+  const identity = await createPqIdentity();
   await saveIdentity({ id: label, identity });
   console.log('DID pós-quântico criado:', identity.did);
 }
