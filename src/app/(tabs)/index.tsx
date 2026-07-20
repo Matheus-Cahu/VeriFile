@@ -1,6 +1,6 @@
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   BadgeCheck,
   ChevronRight,
@@ -15,7 +15,7 @@ import {
   User,
 } from 'lucide-react-native';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { DidCard } from '@/components/did-card';
 import { ThemedText } from '@/components/themed-text';
@@ -108,16 +108,21 @@ export default function HomeScreen() {
   // backend estiver fora, o card ainda navega, só sem número.
   const [pendingCount, setPendingCount] = useState<number>(0);
 
-  useEffect(() => {
-    if (!user?.idToken) return;
-    let active = true;
-    fetchPendingCredentials(user.idToken)
-      .then((list) => active && setPendingCount(list.length))
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [user?.idToken]);
+  // Recarrega a contagem toda vez que a tela ganha foco (inclusive ao voltar de
+  // assinar uma credencial), mantendo o número atualizado. Silencioso: se o
+  // backend estiver fora, o card ainda navega, só sem número.
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.idToken) return;
+      let active = true;
+      fetchPendingCredentials(user.idToken)
+        .then((list) => active && setPendingCount(list.length))
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [user?.idToken])
+  );
 
   function confirmSignOut() {
     Alert.alert('Sair da conta', `Deseja sair de ${user?.email ?? 'sua conta'}?`, [
@@ -165,7 +170,7 @@ export default function HomeScreen() {
         <DidCard />
 
         {/* Assinar nova credencial */}
-        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/signing')}>
+        {/* <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/signing')}>
           <View style={styles.createNew}>
             <View style={styles.createNewIcon}>
               <Pencil size={20} color="#FFFFFF" />
@@ -173,7 +178,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.createNewText}>Assinar nova VC</ThemedText>
             <ChevronRight size={20} color="rgba(255,255,255,0.9)" />
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* Verificar credencial a partir de um PDF */}
         <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/verify')}>
@@ -191,7 +196,11 @@ export default function HomeScreen() {
             icon={<FileText size={26} color={BLUE} />}
             iconBg={BLUE + '18'}
             title="Credenciais pendentes"
-            subtitle={pendingCount > 0 ? 'Ofertas para assinar' : 'Nenhuma pendente'}
+            subtitle={
+              pendingCount > 0
+                ? `${pendingCount} oferta${pendingCount > 1 ? 's' : ''} para assinar`
+                : 'Nenhuma pendente'
+            }
             badge={pendingCount > 0 ? pendingCount : undefined}
             onPress={() => router.push('/pendentes')}
           />
@@ -331,9 +340,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    minWidth: '47%',
-    maxWidth: '48%',
-    flex: 1,
+    width: '100%',
   },
   actionIconContainer: {
     width: 52,
