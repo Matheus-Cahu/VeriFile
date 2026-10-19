@@ -9,6 +9,7 @@ import {
   FileText,
   Globe,
   Inbox,
+  Link2,
   Package,
   ShieldCheck,
   Upload,
@@ -22,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/auth/auth-context';
 import { fetchPendingCredentials } from '@/auth/pending-credentials';
+import { loadPairing } from '@/auth/did-pairing';
 
 // ── Action Card ───────────────────────────────────────────────────────────────
 
@@ -124,6 +126,21 @@ export default function HomeScreen() {
     }, [user?.idToken])
   );
 
+  // Estado do pareamento DID ↔ conta na plataforma (salvo no Keychain).
+  const [paired, setPaired] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.email) return;
+      let active = true;
+      loadPairing(user.email)
+        .then((record) => active && setPaired(record != null))
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [user?.email])
+  );
+
   function confirmSignOut() {
     Alert.alert('Sair da conta', `Deseja sair de ${user?.email ?? 'sua conta'}?`, [
       { text: 'Cancelar', style: 'cancel' },
@@ -203,6 +220,13 @@ export default function HomeScreen() {
             }
             badge={pendingCount > 0 ? pendingCount : undefined}
             onPress={() => router.push('/pendentes')}
+          />
+          <ActionCard
+            icon={<Link2 size={26} color={paired ? '#22C55E' : '#E67E22'} />}
+            iconBg={paired ? '#22C55E18' : '#E67E2218'}
+            title="Pareamento"
+            subtitle={paired ? 'DID pareado' : 'Parear com a plataforma'}
+            onPress={() => router.push('/pareamento')}
           />
           {/* <ActionCard */}
           {/*   icon={<BadgeCheck size={26} color="#22C55E" />} */}

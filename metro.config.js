@@ -24,6 +24,13 @@ config.watchFolders = [...(config.watchFolders ?? []), ssiPqLib];
 
 config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
 
+// O backend (Node/Express) vive em ./backend com node_modules próprio e não faz
+// parte do bundle do app.
+config.resolver.blockList = [
+  ...[config.resolver.blockList ?? []].flat(),
+  new RegExp(`^${path.resolve(projectRoot, 'backend').replace(/[/\\.]/g, '\\$&')}[/\\\\].*`),
+];
+
 config.resolver.extraNodeModules = new Proxy(
   {},
   {

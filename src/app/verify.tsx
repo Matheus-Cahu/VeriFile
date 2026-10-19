@@ -145,6 +145,13 @@ export default function Verify() {
             </Text>
           )}
 
+          {verification.batch && (
+            <Text style={[styles.meta, { color: c.textSecondary }]} numberOfLines={1}>
+              Lote: {verification.batch.batch_id} ({verification.batch.index}/
+              {verification.batch.total})
+            </Text>
+          )}
+
           {verification.errors.length > 0 && (
             <Text style={[styles.errors, { color: '#EF4444' }]}>
               Erros: {verification.errors.join(', ')}

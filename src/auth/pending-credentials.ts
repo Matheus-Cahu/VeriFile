@@ -1,10 +1,10 @@
 // Cliente da rota de credenciais pendentes do backend (web-ssiaas).
 //
-// O app busca as VCs com status PENDING em que o usuário logado é o HOLDER —
-// ofertas emitidas por um issuer aguardando o aceite/assinatura do holder. A
-// autenticação é a mesma do login mobile: mandamos o idToken do Google em
-// `Authorization: Bearer <idToken>` (ver src/auth/backend.ts e, no backend,
-// lib/mobile-auth.ts).
+// Por padrão o backend devolve as VCs PENDING em que o usuário logado é o
+// ISSUER: o holder já aceitou a oferta na web e falta a assinatura do emissor
+// no app. A autenticação é a mesma do login mobile: mandamos o idToken do
+// Google em `Authorization: Bearer <idToken>` (ver src/auth/backend.ts e, no
+// backend, backend/src/routes/pending-credentials.ts).
 import { API_BASE_URL } from '../config/env';
 
 const ENDPOINT = '/api/mobile/credenciais/pendentes';

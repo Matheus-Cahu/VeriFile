@@ -5,11 +5,13 @@
 // A API nativa é assíncrona (TurboModule): todas as funções abaixo são async.
 // Bytes de PDF cruzam a ponte como base64 padrão.
 import {
+  canonicalJson,
   createDidRaw,
   createSchemaFromAttributes,
   embedSignedCredentialInPdfBytes,
   extractCredentialManifestFromPdf,
   issueCredentialFromSchemaRaw,
+  mldsaSign,
   signedCredentialToPdf,
   verifyDidDocument as verifyDidDocumentNative,
   verifySignedCredential,
@@ -134,6 +136,8 @@ export interface PdfVerification {
   pdfBaseHashValid: boolean;
   didKeyMatch: boolean;
   errors: string[];
+  /** Lote de emissão, se a credencial foi assinada em lote. */
+  batch: BatchRef | null;
   /** Diagnóstico completo (JSON formatado). */
   raw: string;
 }
@@ -164,9 +168,13 @@ export async function verifyCredentialPdf(
   pdfBytes: ArrayBuffer,
   issuerDidDocument: string
 ): Promise<PdfVerification> {
+  const pdfBase64 = arrayBufferToBase64(pdfBytes);
   const r = (await verifySignedCredentialPdfBytes(
-    arrayBufferToBase64(pdfBytes),
+    pdfBase64,
     issuerDidDocument
+  )) as any;
+  const manifest = (await extractCredentialManifestFromPdf(pdfBase64).catch(
+    () => null
   )) as any;
   return {
     valid: !!r.valid,
@@ -178,8 +186,57 @@ export async function verifyCredentialPdf(
     pdfBaseHashValid: !!r.pdf_base_hash_valid,
     didKeyMatch: !!r.did_key_match,
     errors: r.errors ?? [],
+    batch: manifest?.signed_credential
+      ? getBatchRef(manifest.signed_credential)
+      : null,
     raw: JSON.stringify(r, null, 2),
   };
+}
+
+/** Chave pública de um DID Document (formato `ssi_pq_did_document_v1`). */
+export interface DidPublicKey {
+  /** Perfil do algoritmo, ex.: "ML-DSA-65" ou "ML-KEM-768". */
+  type: string;
+  /** Chave pública multibase/base58btc (prefixo `z`). */
+  publicKeyMultibase: string;
+}
+
+/** Extrai a chave pública ML-DSA (`prefix = 'ML-DSA'`) ou ML-KEM do DID Document. */
+export function getDidPublicKey(
+  didDocumentJson: string,
+  prefix: 'ML-DSA' | 'ML-KEM'
+): DidPublicKey | null {
+  const doc = JSON.parse(didDocumentJson) as {
+    keys?: { type?: string; public_key_multibase?: string }[];
+  };
+  const key = doc.keys?.find((k) => k.type?.startsWith(prefix));
+  if (!key?.type || !key.public_key_multibase) return null;
+  return { type: key.type, publicKeyMultibase: key.public_key_multibase };
+}
+
+/** Contexto ML-DSA do desafio de pareamento (o mesmo verificado pela plataforma). */
+export const PAIRING_SIGNATURE_CONTEXT = 'did-pairing-challenge';
+
+/**
+ * Assina o desafio de pareamento da plataforma com a chave ML-DSA do DID.
+ *
+ * A mensagem é o JSON canônico de `{pairingId, nonce, expiresAt, did}` em
+ * UTF-8, exatamente como a plataforma reconstrói para verificar
+ * (web-ssiaas: verifyPairingChallengeProof). Retorna a assinatura em base64url.
+ */
+export async function signPairingChallenge(
+  challenge: { pairingId: string; nonce: string; expiresAt: string; did: string },
+  mldsaProfile: string,
+  mldsaPrivateKey: string
+): Promise<string> {
+  const canonical = await canonicalJson(JSON.stringify(challenge));
+  const messageBytes = new TextEncoder().encode(canonical);
+  return mldsaSign(
+    mldsaProfile,
+    mldsaPrivateKey,
+    arrayBufferToBase64(messageBytes.buffer as ArrayBuffer),
+    PAIRING_SIGNATURE_CONTEXT
+  );
 }
 
 /** Verifica a auto-assinatura e a coerência de fingerprint de um DID Document. */
@@ -188,6 +245,35 @@ export async function verifyDidDocument(
 ): Promise<boolean> {
   const r = (await verifyDidDocumentNative(didDocumentJson)) as any;
   return !!(r?.valid ?? r?.fingerprintMatchesKeys);
+}
+
+/** Valor de `BatchRef.type`, para distinguir de outros usos de `status_ref`. */
+export const BATCH_REF_TYPE = 'verifile_batch_v1';
+
+/**
+ * Identificação do lote de emissão. Vai em `credential.status_ref`, que entra
+ * no JSON canônico assinado pelo emissor: não dá para mover uma credencial de
+ * lote sem invalidar a assinatura. Credenciais do mesmo lote compartilham
+ * `batch_id` (e `issued_at`).
+ */
+export interface BatchRef {
+  type: typeof BATCH_REF_TYPE;
+  batch_id: string;
+  /** Posição da credencial no lote, começando em 1. */
+  index: number;
+  total: number;
+}
+
+/** Lê o `BatchRef` de uma credencial assinada (JSON ou objeto), se houver. */
+export function getBatchRef(signedCredential: string | object): BatchRef | null {
+  const obj =
+    typeof signedCredential === 'string'
+      ? JSON.parse(signedCredential)
+      : (signedCredential as any);
+  const ref = obj?.credential?.status_ref;
+  return ref?.type === BATCH_REF_TYPE && typeof ref.batch_id === 'string'
+    ? (ref as BatchRef)
+    : null;
 }
 
 export interface IssuedCredential {
@@ -206,10 +292,11 @@ export interface IssuedCredential {
 export async function issueCredential(
   issuerDidDocument: string,
   issuerMldsaPrivateKey: string,
-  attributes: Record<string, unknown>
+  attributes: Record<string, unknown>,
+  options?: { issuedAt?: string; batch?: BatchRef }
 ): Promise<IssuedCredential> {
   const attributesJson = JSON.stringify(attributes);
-  const now = new Date().toISOString();
+  const now = options?.issuedAt ?? new Date().toISOString();
   const schema = await createSchemaFromAttributes(attributesJson, {
     createdAt: now,
   } as any);
@@ -220,7 +307,7 @@ export async function issueCredential(
     attributesJson,
     issuerDidDocument,
     issuerMldsaPrivateKey,
-    { issuedAt: now } as any
+    { issuedAt: now, statusRef: options?.batch ?? null } as any
   );
   const signedCredential = JSON.stringify(signedCredentialObj);
   const verification = (await verifySignedCredential(

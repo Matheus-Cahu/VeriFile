@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Ciclo de vida de uma VC (baseado no W3C VC Status List)
+enum VCStatus {
+  OFFERED   // Nova oferta criada pelo emissor, aguardando aceite do Holder
+  PENDING   // Oferta aceita pelo Holder, aguardando assinatura do Issuer no app
+  ACTIVE    // Aceita e válida
+  REJECTED  // Rejeitada pelo Holder
+  REVOKED   // Revogada pelo Issuer
+}
+
+// Visibilidade de um schema:
+// PRIVATE → visível apenas para o criador (padrão de nascimento)
+// PUBLIC  → o criador optou por torná-lo um template para a comunidade
+enum SchemaVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+// Onde o conteúdo do schema está armazenado.
+// Usado apenas por CredentialSchema — credenciais NUNCA vão para o IPFS.
+enum StorageLocation {
+  LOCAL
+  IPFS
+}
+
+// Status de um desafio de pareamento de DID
+enum DidPairingStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+
+  // Opcional — preenchido apenas após o primeiro login
+  cpf           String?   @unique
+
+  // DID (Decentralized Identifier) do usuário no padrão SSI
+  did           String?   @unique
+
+  // [DEPRECATED] — Usar didDocument. A chave ML-DSA pode ser extraída de lá.
+  // Chave pública ML-DSA (multibase) associada à DID, usada para
+  // verificar assinaturas e montar o DID Document (W3C)
+  didPublicKey  String?
+
+  // Chave pública ML-KEM (multibase) associada à DID, usada para
+  // cifragem e encapsulamento de segredos pós-quânticos
+  didMlkemKey   String?
+
+  // Documento DID completo emitido pelo wallet/signer, já contendo
+  // as chaves ML-DSA/ML-KEM e demais metadados necessários.
+  didDocument   Json?
+  // Timestamp de quando o pareamento foi concluído com sucesso.
+  didPairedAt   DateTime?
+
+  // CID do IPFS para o Documento DID
+  didIpfsCid     String?
+  // ID administrativo retornado pelo Pinata
+  didPinataFileId String?
+  // Momento em que o Documento DID foi publicado no IPFS
+  didPublishedAt DateTime?
+
+  // Idioma preferido do usuário ("en", "pt", etc.)
+  language      String    @default("en")
+
+  // Quantidade de dias que a plataforma deve reter o PDF após assinatura
+  // configurado pelo emissor (1 a 15)
+  pdfRetentionDays Int    @default(7)
+
+  // Quantidade de dias que a oferta de credencial fica válida
+  offerRetentionDays     Int @default(15)
+
+  // Quantidade de dias que o histórico da credencial rejeitada é mantido
+  rejectionRetentionDays Int @default(15)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  schemasCreated      CredentialSchema[]
+  credentialsIssued   VerifiableCredential[] @relation("IssuerRelation")
+  credentialsReceived VerifiableCredential[] @relation("HolderRelation")
+  didPairingChallenges DidPairingChallenge[]
+  didSearchChallenges  DidSearchChallenge[]
+  accounts            Account[]
+  sessions            Session[]
+
+  @@map("users")
+}
+
+
+// Define a "estrutura" de uma credencial.
+model CredentialSchema {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+
+  // Versão simples — sem cadeia de parentId/children
+  version     String   @default("1.0")
+
+  // PRIVATE por padrão; o criador pode torná-lo PUBLIC depois
+  visibility  SchemaVisibility @default(PRIVATE)
+
+  // Onde este schema está armazenado
+  storageLocation StorageLocation @default(LOCAL)
+
+  // CID do IPFS — sem @unique, pois conteúdos idênticos geram o mesmo hash
+  ipfsCid     String?
+
+  // ID administrativo retornado pelo Pinata
+  pinataFileId String?
+
+  // Marca o momento em que o schema foi publicado no IPFS
+  publishedAt DateTime?
+
+  // Estrutura JSON que define os campos exigidos pela credencial
+  jsonSchema  Json
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id])
+
+  @@map("credential_schemas")
+}
+
+
+// A credencial em si: já preenchida e emitida para um Holder.
+// Segue a estrutura W3C VC Data Model.
+model VerifiableCredential {
+  id        String   @id @default(cuid())
+
+  // Payload W3C/JSON-LD completo (usado enquanto PENDING).
+  // Após assinatura, é substituído pelos metadados da credencial.
+  vcPayload Json
+
+  // Metadados extraídos e mantidos permanentemente
+  metadata  Json?
+
+  // Arquivo PDF cifrado armazenado após o callback
+  pdfFile   Bytes?
+
+  // Hash SHA-256 do arquivo original decifrado
+  pdfHash   String?
+
+  status    VCStatus @default(OFFERED)
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime?
+  pdfDownloadedAt DateTime?
+  revokedAt DateTime?
+  
+  // Agrupador para emissão em lote. Nulo se for emissão individual.
+  batchId   String?
+
+  issuerId  String
+  issuer    User     @relation("IssuerRelation", fields: [issuerId], references: [id])
+
+  holderId  String
+  holder    User     @relation("HolderRelation", fields: [holderId], references: [id])
+
+  @@map("verifiable_credentials")
+}
+
+
+// Desafio para parear a conta de um usuário com um DID gerado em um
+// aplicativo assinador externo (ex: app móvel).
+model DidPairingChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  cpf       String
+  email     String
+  pairingId String   @unique
+  nonce     String
+  status    DidPairingStatus @default(PENDING)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([expiresAt])
+  @@map("did_pairing_challenges")
+}
+
+// MODELS ABAIXO: Gerados automaticamente pelo @auth/prisma-adapter
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Status de um desafio de busca de DID
+enum DidSearchStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+}
+
+// Desafio criptográfico para o App Mobile buscar DIDs
+model DidSearchChallenge {
+  id           String          @id @default(cuid())
+  nonce        String
+  requesterId  String
+  status       DidSearchStatus @default(PENDING)
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime        @default(now())
+
+  requester    User            @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([requesterId, status])
+  @@index([expiresAt])
+  @@map("did_search_challenges")
+}
