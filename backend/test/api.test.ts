@@ -4,6 +4,7 @@
 // no formato "test:<email>:<sub>".
 import { after, before, beforeEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
@@ -261,6 +262,132 @@ describe("POST /api/v1/did-pairings/:pairingId/complete", () => {
       token: tokenFor("b@example.com"),
       body: pairingBody(b.challenge, a.identity),
     });
+    assert.equal(res.status, 409);
+  });
+});
+
+describe("POST /api/mobile/credenciais/:id/assinatura", () => {
+  type Identity = { did: string; didDocument: object; privateKeys: { mldsaPrivateKey: string } };
+
+  // Gera o PDF-credencial final como o app (VeriFile/src/crypto/keys.tsx).
+  function signedPdf(identity: Identity, attributes: object, statusRef?: object): string {
+    const now = new Date().toISOString();
+    const schema = core.createSchemaFromAttributes(attributes, { createdAt: now });
+    const signed = core.issueCredentialFromSchema(
+      schema,
+      attributes,
+      identity.didDocument,
+      identity.privateKeys.mldsaPrivateKey,
+      { issuedAt: now, statusRef }
+    );
+    const base = core.signedCredentialToPdf(signed);
+    const pdf = core.embedSignedCredentialInPdf(
+      base,
+      signed,
+      identity.didDocument,
+      identity.privateKeys.mldsaPrivateKey,
+      { createdAt: now }
+    );
+    return Buffer.from(pdf).toString("base64");
+  }
+
+  const newIdentity = (): Identity =>
+    core.createDid({ mldsa: "ML-DSA-65", mlkem: "ML-KEM-768", createdAt: new Date().toISOString() });
+
+  async function setup() {
+    const identity = newIdentity();
+    const issuer = await prisma.user.create({
+      data: { email: "emissor@example.com", did: identity.did, didDocument: identity.didDocument },
+    });
+    const holder = await prisma.user.create({ data: { email: "titular@example.com", did: "did:ssipq:titular" } });
+    const vc = await prisma.verifiableCredential.create({
+      data: {
+        issuerId: issuer.id,
+        holderId: holder.id,
+        status: "PENDING",
+        batchId: "lote-web",
+        vcPayload: { credentialSubject: { id: "did:x", curso: "Computação" } },
+        metadata: { schemaName: "Diploma" },
+      },
+    });
+    return { identity, issuer, vc };
+  }
+
+  const url = (id: string) => `/api/mobile/credenciais/${id}/assinatura`;
+  const token = tokenFor("emissor@example.com");
+
+  test("PDF assinado pelo DID pareado passa a VC para ACTIVE", async () => {
+    const { identity, vc } = await setup();
+    const batch = { type: "verifile_batch_v1", batch_id: "lote-app", index: 1, total: 1 };
+    const pdf = signedPdf(identity, { curso: "Computação" }, batch);
+    const res = await api(url(vc.id), { token, body: { pdf } });
+    const body = (await res.json()) as { status: string; pdfHash: string };
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.equal(body.status, "ACTIVE");
+
+    const stored = await prisma.verifiableCredential.findUniqueOrThrow({ where: { id: vc.id } });
+    const expectedHash = createHash("sha256").update(Buffer.from(pdf, "base64")).digest("hex");
+    assert.equal(stored.status, "ACTIVE");
+    assert.equal(stored.pdfHash, expectedHash);
+    assert.equal(stored.batchId, "lote-web");
+    const metadata = stored.metadata as Record<string, unknown>;
+    assert.equal(metadata.schemaName, "Diploma");
+    assert.equal(metadata.issuerDid, identity.did);
+    assert.equal(metadata.recipientDid, "did:ssipq:titular");
+    assert.deepEqual(metadata.signingBatch, batch);
+
+    // Reenvio não processa de novo.
+    assert.equal((await api(url(vc.id), { token, body: { pdf } })).status, 409);
+  });
+
+  test("recusa PDF assinado por outro DID", async () => {
+    const { vc } = await setup();
+    const res = await api(url(vc.id), { token, body: { pdf: signedPdf(newIdentity(), { curso: "X" }) } });
+    assert.equal(res.status, 422);
+    assert.equal((await prisma.verifiableCredential.findUniqueOrThrow({ where: { id: vc.id } })).status, "PENDING");
+  });
+
+  test("recusa PDF adulterado", async () => {
+    const { identity, vc } = await setup();
+    const bytes = Buffer.from(signedPdf(identity, { curso: "Computação" }), "base64");
+    // Altera um byte do conteúdo visual (início do PDF-base), fora do manifesto.
+    bytes[200] ^= 0xff;
+    const res = await api(url(vc.id), { token, body: { pdf: bytes.toString("base64") } });
+    assert.ok([400, 422].includes(res.status), String(res.status));
+    assert.equal((await prisma.verifiableCredential.findUniqueOrThrow({ where: { id: vc.id } })).status, "PENDING");
+  });
+
+  test("recusa arquivo que não é credencial e corpo sem PDF", async () => {
+    const { vc } = await setup();
+    assert.equal((await api(url(vc.id), { token, body: { pdf: Buffer.from("%PDF-1.4 nada").toString("base64") } })).status, 400);
+    assert.equal((await api(url(vc.id), { token, body: {} })).status, 400);
+  });
+
+  test("só o emissor da VC pode marcá-la como assinada", async () => {
+    const { vc } = await setup();
+    const intruder = newIdentity();
+    await prisma.user.create({
+      data: { email: "intruso@example.com", did: intruder.did, didDocument: intruder.didDocument },
+    });
+    const res = await api(url(vc.id), {
+      token: tokenFor("intruso@example.com"),
+      body: { pdf: signedPdf(intruder, { curso: "X" }) },
+    });
+    assert.equal(res.status, 404);
+    assert.equal((await api(url("nao-existe"), { token, body: { pdf: "eA==" } })).status, 404);
+  });
+
+  test("exige DID pareado na conta", async () => {
+    const { vc } = await setup();
+    await prisma.user.update({ where: { email: "emissor@example.com" }, data: { did: null } });
+    const res = await api(url(vc.id), { token, body: { pdf: signedPdf(newIdentity(), { curso: "X" }) } });
+    assert.equal(res.status, 409);
+  });
+
+  test("só aceita VCs PENDING", async () => {
+    const { identity, vc } = await setup();
+    await prisma.verifiableCredential.update({ where: { id: vc.id }, data: { status: "OFFERED" } });
+    const res = await api(url(vc.id), { token, body: { pdf: signedPdf(identity, { curso: "X" }) } });
     assert.equal(res.status, 409);
   });
 });

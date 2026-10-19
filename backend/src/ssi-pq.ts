@@ -17,6 +17,30 @@ interface SsiPqCore {
   ): boolean;
   didVerify(didDocument: object): boolean;
   didFingerprintMatchesKeys(didDocument: object): boolean;
+  extractCredentialManifestFromPdf(pdfBytes: Buffer): CredentialPdfManifest;
+  verifySignedCredentialPdf(pdfBytes: Buffer, issuerDidDocument: object): CredentialPdfVerification;
+}
+
+/** Parte do manifesto SSI embutido no PDF-credencial que o backend usa. */
+export interface CredentialPdfManifest {
+  document_binding?: { issuer_did?: string };
+  signed_credential?: {
+    credential?: {
+      credential_id?: string;
+      issuer_did?: string;
+      schema_id?: string;
+      issued_at?: string;
+      expires_at?: string | null;
+      status_ref?: unknown;
+    };
+  };
+}
+
+/** Diagnóstico de `verifySignedCredentialPdf` (campos usados aqui). */
+export interface CredentialPdfVerification {
+  valid: boolean;
+  status: string;
+  errors?: string[];
 }
 
 const require = createRequire(import.meta.url);
@@ -81,4 +105,18 @@ export function verifyPairingProof(params: {
     params.context,
     params.signature
   );
+}
+
+/** Lê o manifesto SSI do PDF; null se o PDF não for uma credencial SSI-PQ. */
+export function extractCredentialManifest(pdf: Buffer): CredentialPdfManifest | null {
+  try {
+    return getCore().extractCredentialManifestFromPdf(pdf);
+  } catch {
+    return null;
+  }
+}
+
+/** Verifica assinatura da credencial e o vínculo PDF↔credencial contra o DID Document. */
+export function verifyCredentialPdf(pdf: Buffer, issuerDidDocument: object): CredentialPdfVerification {
+  return getCore().verifySignedCredentialPdf(pdf, issuerDidDocument);
 }

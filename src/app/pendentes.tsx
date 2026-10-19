@@ -31,6 +31,7 @@ import { getIdentity, listDIDs, type DidSummary } from '../wallet/WalletDatabase
 import {
   extractCredentialAttributes,
   fetchPendingCredentials,
+  markCredentialSigned,
   type PendingCredential,
 } from '../auth/pending-credentials';
 import { useAuth } from '../auth/auth-context';
@@ -74,6 +75,11 @@ export default function PendingCredentialsScreen() {
   const selected = selectable.filter((cred) => selectedIds.has(cred.id));
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
   const anyBusy = signingId !== null || batchProgress !== null;
+
+  function idToken(): string {
+    if (!user?.idToken) throw new Error('Sessão sem idToken — faça login novamente.');
+    return user.idToken;
+  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -127,24 +133,26 @@ export default function PendingCredentialsScreen() {
       const identity = await getIdentity(selectedDid);
       if (!identity) throw new Error('Identidade não encontrada na carteira.');
 
-      const issued = await issueWithPdf(identity, attributes);
-
-      // Baixa o PDF verificável da credencial assinada para uma pasta.
+      // Pasta escolhida antes de assinar: depois que a plataforma marca a VC
+      // como assinada, o PDF não pode ficar sem destino.
       const saver = await pickPdfSaver();
-      if (saver) {
-        const file = await saver.save(`credencial-${credential.id}`, issued.pdfBase64);
-        Alert.alert('PDF salvo', file);
-      } else {
-        Alert.alert('PDF não salvo', 'Nenhuma pasta foi escolhida.');
+      if (!saver) {
+        Alert.alert('Nada foi assinado', 'Nenhuma pasta foi escolhida para o PDF.');
+        return;
       }
 
+      const issued = await issueWithPdf(identity, attributes);
+      if (!issued.verified) {
+        throw new Error('A verificação local da credencial assinada falhou.');
+      }
+
+      // Atualiza o status na plataforma (PENDING → ACTIVE) e só então salva o
+      // PDF: se o backend recusar, nenhuma credencial "solta" fica no aparelho.
+      await markCredentialSigned(idToken(), credential.id, issued.pdfBase64);
       setSignedIds((prev) => new Set(prev).add(credential.id));
-      Alert.alert(
-        issued.verified ? 'Credencial assinada' : 'Assinada com aviso',
-        issued.verified
-          ? 'A credencial foi assinada e verificada com sucesso.'
-          : 'A credencial foi assinada, mas a verificação local falhou.'
-      );
+
+      const file = await saver.save(`credencial-${credential.id}`, issued.pdfBase64);
+      Alert.alert('Credencial assinada', `Status atualizado na plataforma.\nPDF salvo: ${file}`);
     } catch (err) {
       Alert.alert(
         'Falha ao assinar',
@@ -182,10 +190,10 @@ export default function PendingCredentialsScreen() {
     const batchId = randomUUID();
     const issuedAt = new Date().toISOString();
     let done = 0;
-    let unverified = 0;
 
     setBatchProgress(`0/${batch.length}`);
     try {
+      const token = idToken();
       const identity = await getIdentity(selectedDid);
       if (!identity) throw new Error('Identidade não encontrada na carteira.');
 
@@ -212,10 +220,13 @@ export default function PendingCredentialsScreen() {
             },
           }
         );
-        await saver.save(`credencial-${credential.id}`, issued.pdfBase64);
-        if (!issued.verified) unverified++;
+        if (!issued.verified) {
+          throw new Error(`Verificação local falhou em "${credential.schema.name}".`);
+        }
+        await markCredentialSigned(token, credential.id, issued.pdfBase64);
         done++;
         setSignedIds((prev) => new Set(prev).add(credential.id));
+        await saver.save(`credencial-${credential.id}`, issued.pdfBase64);
         setSelectedIds((prev) => {
           const next = new Set(prev);
           next.delete(credential.id);
@@ -226,7 +237,7 @@ export default function PendingCredentialsScreen() {
       Alert.alert(
         `${done} credencia${done > 1 ? 'is assinadas' : 'l assinada'}`,
         `Lote ${batchId}\nPDFs salvos em ${saver.location}.` +
-          (unverified > 0 ? `\n\n${unverified} falhou na verificação local.` : '')
+          '\nStatus atualizado na plataforma.'
       );
     } catch (err) {
       Alert.alert(

@@ -16,6 +16,7 @@ Todas as rotas autenticadas recebem o idToken do Google Sign-In nativo em
 | `GET` | `/health` | Liveness |
 | `POST` | `/api/auth/mobile/google` | Corpo `{ idToken }`. Devolve `{ user: { id, name, email, image, cpf } }`; cria `User` + `Account` Google se a conta não existir |
 | `GET` | `/api/mobile/credenciais/pendentes?papel=emissor\|titular` | `emissor` (padrão): VCs `PENDING` que o usuário precisa assinar. `titular`: ofertas `OFFERED` aguardando aceite. Devolve `{ papel, credentials: [...] }` |
+| `POST` | `/api/mobile/credenciais/:id/assinatura` | Corpo `{ pdf }` (PDF-credencial final em base64). Só o emissor; verifica o PDF com o core SSI-PQ contra o DID pareado da conta e muda a VC de `PENDING` para `ACTIVE`, gravando `pdfHash` (SHA-256 hex) e os dados da assinatura em `metadata`. Devolve `{ credentialId, status, pdfHash }`; `409` se a conta não tiver DID pareado ou a VC não estiver `PENDING`, `422` se o PDF foi assinado por outro DID ou a assinatura não confere |
 | `POST` | `/api/v1/did-pairings/:pairingId/complete` | Conclui o pareamento criado em `/settings` na web. Exige DID Document válido e prova ML-DSA sobre o JSON canônico de `{pairingId, nonce, expiresAt, did}` (contexto `did-pairing-challenge`). Devolve `{ paired, did, status, pairedAt, bearerToken }` |
 
 Erros sempre em JSON: `{ error, details? }`.
