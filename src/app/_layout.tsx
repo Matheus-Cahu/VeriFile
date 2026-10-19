@@ -31,6 +31,7 @@ function RootNavigator() {
         <Stack.Screen name="signing" options={{ title: 'Assinar nova VC' }} />
         <Stack.Screen name="verify" options={{ title: 'Verificar VC' }} />
         <Stack.Screen name="pendentes" options={{ title: 'Credenciais pendentes' }} />
+        <Stack.Screen name="pareamento" options={{ title: 'Parear com a plataforma' }} />
       </Stack.Protected>
 
       <Stack.Protected guard={!isAuthenticated}>

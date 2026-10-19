@@ -1,10 +1,10 @@
 // Cliente da rota de credenciais pendentes do backend (web-ssiaas).
 //
-// O app busca as VCs com status PENDING em que o usuário logado é o HOLDER —
-// ofertas emitidas por um issuer aguardando o aceite/assinatura do holder. A
-// autenticação é a mesma do login mobile: mandamos o idToken do Google em
-// `Authorization: Bearer <idToken>` (ver src/auth/backend.ts e, no backend,
-// lib/mobile-auth.ts).
+// Por padrão o backend devolve as VCs PENDING em que o usuário logado é o
+// ISSUER: o holder já aceitou a oferta na web e falta a assinatura do emissor
+// no app. A autenticação é a mesma do login mobile: mandamos o idToken do
+// Google em `Authorization: Bearer <idToken>` (ver src/auth/backend.ts e, no
+// backend, backend/src/routes/pending-credentials.ts).
 import { API_BASE_URL } from '../config/env';
 
 const ENDPOINT = '/api/mobile/credenciais/pendentes';
@@ -100,4 +100,55 @@ export function extractCredentialAttributes(
 
   const { id: _omitId, ...attributes } = subject as Record<string, unknown>;
   return attributes;
+}
+
+/**
+ * Avisa a plataforma que a credencial pendente foi assinada: envia o
+ * PDF-credencial final (base64) e o backend, depois de verificá-lo contra o DID
+ * pareado do emissor, muda o status da VC de PENDING para ACTIVE. Lança com a
+ * mensagem do backend se ele recusar (ex.: DID diferente do pareado).
+ */
+export async function markCredentialSigned(
+  idToken: string,
+  credentialId: string,
+  pdfBase64: string
+): Promise<void> {
+  if (!API_BASE_URL) {
+    throw new Error('EXPO_PUBLIC_API_BASE_URL não configurada (.env)');
+  }
+
+  const controller = new AbortController();
+  // O upload do PDF pode demorar mais que a listagem.
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS * 3);
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_BASE_URL}/api/mobile/credenciais/${encodeURIComponent(credentialId)}/assinatura`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pdf: pdfBase64 }),
+        signal: controller.signal,
+      }
+    );
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`backend não respondeu em ${TIMEOUT_MS * 3}ms (${API_BASE_URL})`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as
+      | { error?: string; details?: string }
+      | null;
+    const message = body?.error ?? `backend respondeu ${res.status}`;
+    throw new Error(body?.details ? `${message} (${body.details})` : message);
+  }
 }
